@@ -57,7 +57,7 @@ func getKeyHandler(w http.ResponseWriter, r *http.Request, c *Context) {
 		}
 
 		err = item.Value(func(v []byte) error {
-			fmt.Fprintf(w, "Key: %v\nValue: %v", key, string(v))
+			fmt.Fprintf(w, string(v))
 			return nil
 		})
 		if err != nil {

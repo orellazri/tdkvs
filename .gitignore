@@ -19,3 +19,4 @@ go.work
 .history
 .ionide
 .DS_Store
+badger/

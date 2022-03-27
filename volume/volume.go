@@ -2,6 +2,6 @@ package volume
 
 import "fmt"
 
-func Hey() {
-	fmt.Println("Hey from voulme")
+func Start(port int) {
+	fmt.Printf("Volume server starting on port %d...\n", port)
 }

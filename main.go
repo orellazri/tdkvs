@@ -24,14 +24,12 @@ func main() {
 	switch os.Args[1] {
 	case "master":
 		masterCmd.Parse(os.Args[2:])
-		fmt.Println("Master!")
-		fmt.Println("	port: ", *masterPort)
-		master.Hey()
+		master.Start(*masterPort)
 	case "volume":
 		volumeCmd.Parse(os.Args[2:])
 		fmt.Println("Volume!")
 		fmt.Println("	port: ", *volumePort)
-		volume.Hey()
+		volume.Start(*masterPort)
 	default:
 		fmt.Println("expected `master` or `volume` subcommands")
 		os.Exit(1)

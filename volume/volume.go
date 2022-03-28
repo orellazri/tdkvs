@@ -1,6 +1,7 @@
 package volume
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
@@ -43,6 +44,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 func getKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 	key := mux.Vars(r)["key"]
 	hash := r.URL.Query().Get("hash")
+	as := r.URL.Query().Get("as")
 
 	value, err := c.fs.get(key, hash)
 	if err != nil {
@@ -55,5 +57,13 @@ func getKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 		return
 	}
 
-	fmt.Fprintf(w, "value :%v", value)
+	switch as {
+	case "int":
+		fmt.Fprintf(w, "%v", binary.BigEndian.Uint64(value))
+	case "string":
+		fmt.Fprintf(w, "%v", string(value))
+	default:
+		fmt.Fprintf(w, "%v", value)
+	}
+
 }

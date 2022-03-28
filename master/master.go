@@ -72,6 +72,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 // Handle retrieveing keys
 func getKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 	key := mux.Vars(r)["key"]
+	as := r.URL.Query().Get("as")
 
 	err := c.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get([]byte(key))
@@ -105,7 +106,7 @@ func getKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 			numVolume := utils.JumpConsisntentHash(hash, int32(len(c.config.Volumes)))
 
 			// Request from volume server
-			resp, err := http.Get(fmt.Sprintf("%v/get/%v?hash=%v", c.config.Volumes[numVolume], key, hash))
+			resp, err := http.Get(fmt.Sprintf("%v/get/%v?hash=%v&as=%v", c.config.Volumes[numVolume], key, hash, as))
 			if err != nil {
 				http.Error(w, fmt.Sprintf("An error occurred while retrieving key \"%v\"", key), http.StatusInternalServerError)
 				return

@@ -12,7 +12,7 @@ import (
 	"github.com/orellazri/tdkvs/utils"
 )
 
-type Context struct {
+type context struct {
 	config *utils.Config
 	db     *badger.DB
 }
@@ -29,7 +29,7 @@ func Start(port int, config *utils.Config) {
 	defer db.Close()
 
 	// The context holds the global state for the master server
-	context := Context{
+	context := &context{
 		config,
 		db,
 	}
@@ -57,7 +57,7 @@ func Start(port int, config *utils.Config) {
 	router := mux.NewRouter()
 	router.HandleFunc("/", indexHandler).Methods("GET")
 	router.HandleFunc("/get/{key}", func(w http.ResponseWriter, r *http.Request) {
-		getKeyHandler(w, r, &context)
+		getKeyHandler(w, r, context)
 	}).Methods("GET")
 	http.Handle("/", router)
 	http.ListenAndServe(fmt.Sprintf("localhost:%v", port), router)
@@ -69,7 +69,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // Handle retrieveing keys
-func getKeyHandler(w http.ResponseWriter, r *http.Request, c *Context) {
+func getKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 	key := mux.Vars(r)["key"]
 
 	err := c.db.View(func(txn *badger.Txn) error {

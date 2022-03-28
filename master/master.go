@@ -2,6 +2,7 @@ package master
 
 import (
 	"fmt"
+	"hash/fnv"
 	"log"
 	"net/http"
 
@@ -11,13 +12,12 @@ import (
 )
 
 type Context struct {
-	db *badger.DB
+	config *utils.Config
+	db     *badger.DB
 }
 
 // Start master server
 func Start(port int, config *utils.Config) {
-	fmt.Printf("%v\n", config)
-
 	log.Printf("Master server starting on port %v...", port)
 
 	// Initialize BadgerDB
@@ -29,6 +29,7 @@ func Start(port int, config *utils.Config) {
 
 	// The context holds the global state for the master server
 	context := Context{
+		config,
 		db,
 	}
 
@@ -91,7 +92,17 @@ func getKeyHandler(w http.ResponseWriter, r *http.Request, c *Context) {
 	if err != nil {
 		if err == badger.ErrKeyNotFound {
 			// Key doesn't exist
-			// TODO: Add to volume server
+
+			// Convert string key to uint64
+			// TODO: Check if this is safe for concurrent use
+			hahser := fnv.New64()
+			hahser.Write([]byte(key))
+			keyAsInt := hahser.Sum64()
+
+			// Choose a volume server using jump consistent hash
+			numVolume := utils.JumpConsisntentHash(keyAsInt, int32(len(c.config.Volumes)))
+
+			fmt.Fprintf(w, "key: %v\nvolume: %v", keyAsInt, numVolume)
 		} else {
 			fmt.Fprintf(w, "An error occurred while retrieving key \"%v\"", key)
 		}

@@ -42,9 +42,8 @@ func main() {
 		master.Start(*masterPort, &config)
 	case "volume":
 		volumeCmd.Parse(os.Args[2:])
-		fmt.Println("Volume!")
-		fmt.Println("	port: ", *volumePort)
-		volume.Start(*masterPort)
+
+		volume.Start(*volumePort)
 	default:
 		fmt.Println("expected `master` or `volume` subcommands")
 		os.Exit(1)

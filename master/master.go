@@ -3,6 +3,7 @@ package master
 import (
 	"fmt"
 	"hash/fnv"
+	"io"
 	"log"
 	"net/http"
 
@@ -102,7 +103,18 @@ func getKeyHandler(w http.ResponseWriter, r *http.Request, c *Context) {
 			// Choose a volume server using jump consistent hash
 			numVolume := utils.JumpConsisntentHash(keyAsInt, int32(len(c.config.Volumes)))
 
-			fmt.Fprintf(w, "key: %v\nvolume: %v", keyAsInt, numVolume)
+			// Request from volume server
+			resp, err := http.Get(fmt.Sprintf("%v/get/%v", c.config.Volumes[numVolume], key))
+			if err != nil {
+				fmt.Fprintf(w, "An error occurred while retrieving key \"%v\"", key)
+			}
+			defer resp.Body.Close()
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				fmt.Fprintf(w, "An error occurred while retrieving key \"%v\"", key)
+			}
+
+			fmt.Fprintf(w, "%v", string(body))
 		} else {
 			fmt.Fprintf(w, "An error occurred while retrieving key \"%v\"", key)
 		}

@@ -26,5 +26,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 
 // Handle retrieveing keys
 func getKeyHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "hi")
+	key := mux.Vars(r)["key"]
+
+	fmt.Fprintf(w, "get %v", key)
 }

@@ -1,9 +1,11 @@
 package volume
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gorilla/mux"
 )
@@ -40,8 +42,18 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 // Handle retrieveing keys
 func getKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 	key := mux.Vars(r)["key"]
+	hash := r.URL.Query().Get("hash")
 
-	c.fs.test()
+	value, err := c.fs.get(key, hash)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			http.Error(w, fmt.Sprintf("Key \"%v\" does not exist", key), http.StatusInternalServerError)
+		} else {
+			http.Error(w, fmt.Sprintf("An error occurred while retrieving key \"%v\"", key), http.StatusInternalServerError)
+		}
 
-	fmt.Fprintf(w, "get %v", key)
+		return
+	}
+
+	fmt.Fprintf(w, "value :%v", value)
 }

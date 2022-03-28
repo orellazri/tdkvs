@@ -1,6 +1,7 @@
 package master
 
 import (
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -91,32 +92,34 @@ func getKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 	})
 
 	if err != nil {
-		if err == badger.ErrKeyNotFound {
-			// Key doesn't exist
+		if errors.Is(err, badger.ErrKeyNotFound) {
+			// Key doesn't exist. Retrieve from volume server
 
 			// Convert string key to uint64
 			// TODO: Check if this is safe for concurrent use
 			hahser := fnv.New64()
 			hahser.Write([]byte(key))
-			keyAsInt := hahser.Sum64()
+			hash := hahser.Sum64()
 
 			// Choose a volume server using jump consistent hash
-			numVolume := utils.JumpConsisntentHash(keyAsInt, int32(len(c.config.Volumes)))
+			numVolume := utils.JumpConsisntentHash(hash, int32(len(c.config.Volumes)))
 
 			// Request from volume server
-			resp, err := http.Get(fmt.Sprintf("%v/get/%v", c.config.Volumes[numVolume], key))
+			resp, err := http.Get(fmt.Sprintf("%v/get/%v?hash=%v", c.config.Volumes[numVolume], key, hash))
 			if err != nil {
-				fmt.Fprintf(w, "An error occurred while retrieving key \"%v\"", key)
+				http.Error(w, fmt.Sprintf("An error occurred while retrieving key \"%v\"", key), http.StatusInternalServerError)
+				return
 			}
 			defer resp.Body.Close()
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
-				fmt.Fprintf(w, "An error occurred while retrieving key \"%v\"", key)
+				http.Error(w, fmt.Sprintf("An error occurred while retrieving key \"%v\"", key), http.StatusInternalServerError)
+				return
 			}
 
 			fmt.Fprintf(w, "%v", string(body))
 		} else {
-			fmt.Fprintf(w, "An error occurred while retrieving key \"%v\"", key)
+			http.Error(w, fmt.Sprintf("An error occurred while retrieving key \"%v\"", key), http.StatusInternalServerError)
 		}
 	}
 

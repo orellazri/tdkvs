@@ -1,11 +1,29 @@
 package volume
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+)
 
 type fileStorage struct {
 	path string
 }
 
-func (f *fileStorage) test() {
-	fmt.Printf("Hi from %v\n", f.path)
+// Return a path, given a key and the key's hash
+// The path is the root volume path, the first two characters of the hash,
+// the first four characters of the hash, and the hash followed by the key
+// i.e. volume/17/1727/17270204244788214835_answer
+func (fs *fileStorage) keyToPath(key string, hash string) string {
+	return filepath.Join(fs.path, hash[:2], hash[:4], fmt.Sprintf("%v_%v", hash, key))
+}
+
+// Retrieve a key
+func (fs *fileStorage) get(key string, hash string) ([]byte, error) {
+	path := fs.keyToPath(key, hash)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }

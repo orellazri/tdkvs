@@ -7,6 +7,7 @@ import (
 
 	"github.com/dgraph-io/badger/v3"
 	"github.com/gorilla/mux"
+	"github.com/orellazri/tdkvs/utils"
 )
 
 type Context struct {
@@ -14,23 +15,42 @@ type Context struct {
 }
 
 // Start master server
-func Start(port int) {
+func Start(port int, config *utils.Config) {
+	fmt.Printf("%v\n", config)
+
 	log.Printf("Master server starting on port %v...", port)
 
-	db, err := badger.Open(badger.DefaultOptions("badger"))
-	if err != nil {
-		log.Fatal(err)
-	}
+	// Initialize BadgerDB
+	options := badger.DefaultOptions("badger")
+	options.Logger = nil
+	db, err := badger.Open(options)
+	utils.AbortOnError(err)
 	defer db.Close()
 
+	// The context holds the global state for the master server
 	context := Context{
 		db,
 	}
 
-	err = db.Update(func(txn *badger.Txn) error {
-		err := txn.Set([]byte("answer"), []byte("42"))
-		return err
-	})
+	// TEMP: Show all keys
+	// err = db.View(func(txn *badger.Txn) error {
+	// 	opts := badger.DefaultIteratorOptions
+	// 	opts.PrefetchSize = 10
+	// 	it := txn.NewIterator(opts)
+	// 	defer it.Close()
+	// 	for it.Rewind(); it.Valid(); it.Next() {
+	// 		item := it.Item()
+	// 		k := item.Key()
+	// 		err := item.Value(func(v []byte) error {
+	// 			fmt.Printf("key=%s, value=%s\n", k, v)
+	// 			return nil
+	// 		})
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 	}
+	// 	return nil
+	// })
 
 	router := mux.NewRouter()
 	router.HandleFunc("/", indexHandler).Methods("GET")
@@ -56,8 +76,9 @@ func getKeyHandler(w http.ResponseWriter, r *http.Request, c *Context) {
 			return err
 		}
 
+		// Key exists
 		err = item.Value(func(v []byte) error {
-			fmt.Fprintf(w, string(v))
+			// TODO: Retrieve from volume server
 			return nil
 		})
 		if err != nil {
@@ -66,7 +87,14 @@ func getKeyHandler(w http.ResponseWriter, r *http.Request, c *Context) {
 
 		return nil
 	})
+
 	if err != nil {
-		fmt.Fprintf(w, "An error occurred while retrieving key \"%v\"", key)
+		if err == badger.ErrKeyNotFound {
+			// Key doesn't exist
+			// TODO: Add to volume server
+		} else {
+			fmt.Fprintf(w, "An error occurred while retrieving key \"%v\"", key)
+		}
 	}
+
 }

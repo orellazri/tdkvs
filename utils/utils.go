@@ -1,5 +1,19 @@
 package utils
 
+import "log"
+
+// Config struct to unmarshal from the yaml file
+type Config struct {
+	Volumes []string
+}
+
+// Exit with a fatal log if an error occurred
+func AbortOnError(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 // Jump Consistent Hash
 // Takes a 64bit key and number of buckets
 // Outputs a number in the range [0, num_of_buckets]

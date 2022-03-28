@@ -20,3 +20,5 @@ go.work
 .ionide
 .DS_Store
 badger/
+*.yaml
+*.yml

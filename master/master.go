@@ -3,10 +3,10 @@ package master
 import (
 	"errors"
 	"fmt"
-	"hash/fnv"
 	"io"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/dgraph-io/badger/v3"
 	"github.com/gorilla/mux"
@@ -60,6 +60,9 @@ func Start(port int, config *utils.Config) {
 	router.HandleFunc("/get/{key}", func(w http.ResponseWriter, r *http.Request) {
 		getKeyHandler(w, r, context)
 	}).Methods("GET")
+	router.HandleFunc("/set/{key}", func(w http.ResponseWriter, r *http.Request) {
+		setKeyHandler(w, r, context)
+	}).Methods("PUT")
 	http.Handle("/", router)
 	http.ListenAndServe(fmt.Sprintf("localhost:%v", port), router)
 }
@@ -96,16 +99,10 @@ func getKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 		if errors.Is(err, badger.ErrKeyNotFound) {
 			// Key doesn't exist. Retrieve from volume server
 
-			// Convert string key to uint64
-			// TODO: Check if this is safe for concurrent use
-			hahser := fnv.New64()
-			hahser.Write([]byte(key))
-			hash := hahser.Sum64()
-
 			// Choose a volume server using jump consistent hash
-			numVolume := utils.JumpConsisntentHash(hash, int32(len(c.config.Volumes)))
+			hash, numVolume := utils.ChooseBucketString(key, int32(len(c.config.Volumes)))
 
-			// Request from volume server
+			// Send request to volume server
 			resp, err := http.Get(fmt.Sprintf("%v/get/%v?hash=%v&as=%v", c.config.Volumes[numVolume], key, hash, as))
 			if err != nil {
 				http.Error(w, fmt.Sprintf("An error occurred while retrieving key \"%v\"", key), http.StatusInternalServerError)
@@ -124,4 +121,34 @@ func getKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 		}
 	}
 
+}
+
+// Handle setting keys
+func setKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
+	key := mux.Vars(r)["key"]
+
+	data, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "An error occurred while parsing request body", http.StatusInternalServerError)
+		return
+	}
+	value := string(data)
+
+	hash, numVolume := utils.ChooseBucketString(value, int32(len(c.config.Volumes)))
+
+	// Send request to volume server
+	req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("%v/set/%v?hash=%v", c.config.Volumes[numVolume], key, hash), strings.NewReader(value))
+	if err != nil {
+		http.Error(w, fmt.Sprintf("An error occurred while setting key \"%v\"", key), http.StatusInternalServerError)
+		return
+	}
+	client := http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("An error occurred while setting key \"%v\"", key), http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	fmt.Fprintf(w, "%v", resp.StatusCode)
 }

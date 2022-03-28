@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -31,6 +32,9 @@ func Start(port int) {
 	router.HandleFunc("/get/{key}", func(w http.ResponseWriter, r *http.Request) {
 		getKeyHandler(w, r, context)
 	}).Methods("GET")
+	router.HandleFunc("/set/{key}", func(w http.ResponseWriter, r *http.Request) {
+		setKeyHandler(w, r, context)
+	}).Methods("PUT")
 	http.Handle("/", router)
 	http.ListenAndServe(fmt.Sprintf("localhost:%v", port), router)
 }
@@ -44,6 +48,12 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 func getKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 	key := mux.Vars(r)["key"]
 	hash := r.URL.Query().Get("hash")
+
+	if key == "" || hash == "" {
+		http.Error(w, "Invalid key or hash", http.StatusBadRequest)
+		return
+	}
+
 	as := r.URL.Query().Get("as")
 
 	value, err := c.fs.get(key, hash)
@@ -66,4 +76,19 @@ func getKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 		fmt.Fprintf(w, "%v", value)
 	}
 
+}
+
+// Handle settings keys
+func setKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
+	key := mux.Vars(r)["key"]
+	hash := r.URL.Query().Get("hash")
+
+	data, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "An error occurred while parsing request body", http.StatusInternalServerError)
+		return
+	}
+	value := string(data)
+
+	fmt.Printf("%v\n%v\n%v\n", key, hash, value)
 }

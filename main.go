@@ -29,7 +29,7 @@ func main() {
 		masterCmd.Parse(os.Args[2:])
 
 		if *masterConfig == "" {
-			fmt.Println("a config file is required")
+			fmt.Println("config file is required. specify a path with -config")
 			os.Exit(1)
 		}
 

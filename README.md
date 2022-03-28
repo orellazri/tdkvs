@@ -1,3 +1,3 @@
 # tdkvs
 
-Toy distributed key-value store in Go.
+Distributed key-value store in Go.

@@ -64,6 +64,9 @@ func Start(port int, config *utils.Config) {
 	router.HandleFunc("/set/{key}", func(w http.ResponseWriter, r *http.Request) {
 		setKeyHandler(w, r, context)
 	}).Methods("PUT")
+	router.HandleFunc("/delete/{key}", func(w http.ResponseWriter, r *http.Request) {
+		deleteKeyHandler(w, r, context)
+	}).Methods("DELETE")
 	http.Handle("/", router)
 	http.ListenAndServe(fmt.Sprintf("localhost:%v", port), router)
 }
@@ -77,6 +80,11 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 func getKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 	key := mux.Vars(r)["key"]
 	as := r.URL.Query().Get("as")
+
+	if key == "" {
+		http.Error(w, "Key is required", http.StatusBadRequest)
+		return
+	}
 
 	err := c.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get([]byte(key))
@@ -130,6 +138,10 @@ func getKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 // Handle setting keys
 func setKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 	key := mux.Vars(r)["key"]
+	if key == "" {
+		http.Error(w, "Key is required", http.StatusBadRequest)
+		return
+	}
 
 	data, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -179,5 +191,48 @@ func setKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 		fmt.Fprintf(w, "ok")
 	} else {
 		http.Error(w, fmt.Sprintf("An error occurred while setting key \"%v\"", key), http.StatusInternalServerError)
+	}
+}
+
+// Handle deleting keys
+func deleteKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
+	key := mux.Vars(r)["key"]
+	if key == "" {
+		http.Error(w, "Key is required", http.StatusBadRequest)
+		return
+	}
+
+	// Check if key exists in db
+	err := c.db.View(func(txn *badger.Txn) error {
+		_, err := txn.Get([]byte(key))
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		if errors.Is(err, badger.ErrKeyNotFound) {
+			http.Error(w, fmt.Sprintf("Key \"%v\" does not exist", key), http.StatusBadRequest)
+			return
+		} else {
+			http.Error(w, fmt.Sprintf("An error occurred while deleting key \"%v\"", key), http.StatusInternalServerError)
+			log.Println(err)
+			return
+		}
+	} else {
+		err := c.db.Update(func(txn *badger.Txn) error {
+			err := txn.Delete([]byte(key))
+			return err
+		})
+
+		if err != nil {
+			http.Error(w, fmt.Sprintf("An error occurred while deleting key \"%v\"", key), http.StatusInternalServerError)
+			log.Println(err)
+			return
+		}
+
+		fmt.Fprintf(w, "ok")
 	}
 }

@@ -1,6 +1,6 @@
 # tdkvs
 
-[![Tests](https://github.com/orellazri/tdkvs/actions/workflows/go.yml/badge.svg)](https://github.com/orellazri/tdkvs/actions/workflows/go.yml)
+[![Tests](https://github.com/orellazri/tdkvs/actions/workflows/tests.yml/badge.svg)](https://github.com/orellazri/tdkvs/actions/workflows/tests.yml)
 
 Distributed key-value store in Go.
 

@@ -89,6 +89,7 @@ func setKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 		return
 	}
 	value := string(data)
+	path := c.fs.keyToPath(key, hash)
 
-	fmt.Printf("%v\n%v\n%v\n", key, hash, value)
+	fmt.Fprintf(w, "value: %v\npath: %v\n", value, path)
 }

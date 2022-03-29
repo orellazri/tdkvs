@@ -133,8 +133,12 @@ func setKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 		return
 	}
 	value := string(data)
+	if value == "" {
+		http.Error(w, "Request body is required", http.StatusBadRequest)
+		return
+	}
 
-	hash, numVolume := utils.ChooseBucketString(value, int32(len(c.config.Volumes)))
+	hash, numVolume := utils.ChooseBucketString(key, int32(len(c.config.Volumes)))
 
 	// Send request to volume server
 	req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("%v/set/%v?hash=%v", c.config.Volumes[numVolume], key, hash), strings.NewReader(value))

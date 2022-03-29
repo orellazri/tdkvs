@@ -37,7 +37,10 @@ func main() {
 		data, err := os.ReadFile(*masterConfig)
 		utils.AbortOnError(err)
 		err = yaml.Unmarshal(data, &config)
-		utils.AbortOnError(err)
+		if err != nil {
+			fmt.Println("The config yaml file specified is invalid!")
+			os.Exit(1)
+		}
 
 		master.Start(*masterPort, &config)
 	case "volume":

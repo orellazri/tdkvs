@@ -21,7 +21,7 @@ func Start(port int) {
 	log.Printf("Volume server starting on port %v...", port)
 
 	fs := &fileStorage{
-		path: "volume1/",
+		path: "/tmp/volume1",
 	}
 	context := &context{
 		fs,
@@ -62,6 +62,7 @@ func getKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 			http.Error(w, fmt.Sprintf("Key \"%v\" does not exist", key), http.StatusInternalServerError)
 		} else {
 			http.Error(w, fmt.Sprintf("An error occurred while retrieving key \"%v\"", key), http.StatusInternalServerError)
+			log.Println(err)
 		}
 
 		return
@@ -75,7 +76,6 @@ func getKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 	default:
 		fmt.Fprintf(w, "%v", value)
 	}
-
 }
 
 // Handle settings keys
@@ -86,10 +86,16 @@ func setKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 	data, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "An error occurred while parsing request body", http.StatusInternalServerError)
+		log.Println(err)
 		return
 	}
-	value := string(data)
-	path := c.fs.keyToPath(key, hash)
 
-	fmt.Fprintf(w, "value: %v\npath: %v\n", value, path)
+	err = c.fs.set(key, hash, data)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("An error occurred while setting key \"%v\"", key), http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+
+	fmt.Fprintf(w, "success")
 }

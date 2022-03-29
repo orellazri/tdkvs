@@ -106,18 +106,21 @@ func getKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 			resp, err := http.Get(fmt.Sprintf("%v/get/%v?hash=%v&as=%v", c.config.Volumes[numVolume], key, hash, as))
 			if err != nil {
 				http.Error(w, fmt.Sprintf("An error occurred while retrieving key \"%v\"", key), http.StatusInternalServerError)
+				log.Println(err)
 				return
 			}
 			defer resp.Body.Close()
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
 				http.Error(w, fmt.Sprintf("An error occurred while retrieving key \"%v\"", key), http.StatusInternalServerError)
+				log.Println(err)
 				return
 			}
 
 			fmt.Fprintf(w, "%v", string(body))
 		} else {
 			http.Error(w, fmt.Sprintf("An error occurred while retrieving key \"%v\"", key), http.StatusInternalServerError)
+			log.Println(err)
 		}
 	}
 
@@ -130,6 +133,7 @@ func setKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 	data, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "An error occurred while parsing request body", http.StatusInternalServerError)
+		log.Println(err)
 		return
 	}
 	value := string(data)
@@ -144,15 +148,21 @@ func setKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 	req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("%v/set/%v?hash=%v", c.config.Volumes[numVolume], key, hash), strings.NewReader(value))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("An error occurred while setting key \"%v\"", key), http.StatusInternalServerError)
+		log.Println(err)
 		return
 	}
 	client := http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("An error occurred while setting key \"%v\"", key), http.StatusInternalServerError)
+		log.Println(err)
 		return
 	}
 	defer resp.Body.Close()
 
-	fmt.Fprintf(w, "%v", resp.StatusCode)
+	if resp.StatusCode == 200 {
+		fmt.Fprintf(w, "ok")
+	} else {
+		http.Error(w, fmt.Sprintf("An error occurred while setting key \"%v\"", key), http.StatusInternalServerError)
+	}
 }

@@ -3,6 +3,7 @@ package volume
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 )
 
@@ -32,4 +33,29 @@ func (fs *fileStorage) get(key string, hash string) ([]byte, error) {
 		return nil, err
 	}
 	return data, nil
+}
+
+// Set value to key
+func (fs *fileStorage) set(key string, hash string, value []byte) error {
+	// TODO: Check mutex
+	filePath := fs.keyToPath(key, hash)
+
+	// Make directores and write to file
+	err := os.MkdirAll(path.Dir(filePath), 0777)
+	if err != nil {
+		return err
+	}
+
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0777)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = file.Write(value)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

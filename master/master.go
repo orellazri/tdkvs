@@ -1,6 +1,7 @@
 package master
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -36,24 +37,24 @@ func Start(port int, config *utils.Config) {
 	}
 
 	// TEMP: Show all keys
-	// err = db.View(func(txn *badger.Txn) error {
-	// 	opts := badger.DefaultIteratorOptions
-	// 	opts.PrefetchSize = 10
-	// 	it := txn.NewIterator(opts)
-	// 	defer it.Close()
-	// 	for it.Rewind(); it.Valid(); it.Next() {
-	// 		item := it.Item()
-	// 		k := item.Key()
-	// 		err := item.Value(func(v []byte) error {
-	// 			fmt.Printf("key=%s, value=%s\n", k, v)
-	// 			return nil
-	// 		})
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 	}
-	// 	return nil
-	// })
+	err = db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchSize = 10
+		it := txn.NewIterator(opts)
+		defer it.Close()
+		for it.Rewind(); it.Valid(); it.Next() {
+			item := it.Item()
+			k := item.Key()
+			err := item.Value(func(v []byte) error {
+				fmt.Printf("key=%s, value=%s\n", k, v)
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 
 	router := mux.NewRouter()
 	router.HandleFunc("/", indexHandler).Methods("GET")
@@ -83,9 +84,28 @@ func getKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 			return err
 		}
 
-		// Key exists
+		// Key exists. Retrieve from volume server
 		err = item.Value(func(v []byte) error {
-			// TODO: Retrieve from volume server
+			numVolume := binary.BigEndian.Uint32(v)
+			hash := utils.HashString(key)
+
+			// Send request to volume server
+			resp, err := http.Get(fmt.Sprintf("%v/get/%v?hash=%v&as=%v", c.config.Volumes[numVolume], key, hash, as))
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != 200 {
+				return errors.New("Respose from volume server is not 200 OK")
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+
+			fmt.Fprintf(w, string(body))
 			return nil
 		})
 		if err != nil {
@@ -97,27 +117,8 @@ func getKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 
 	if err != nil {
 		if errors.Is(err, badger.ErrKeyNotFound) {
-			// Key doesn't exist. Retrieve from volume server
-
-			// Choose a volume server using jump consistent hash
-			hash, numVolume := utils.ChooseBucketString(key, int32(len(c.config.Volumes)))
-
-			// Send request to volume server
-			resp, err := http.Get(fmt.Sprintf("%v/get/%v?hash=%v&as=%v", c.config.Volumes[numVolume], key, hash, as))
-			if err != nil {
-				http.Error(w, fmt.Sprintf("An error occurred while retrieving key \"%v\"", key), http.StatusInternalServerError)
-				log.Println(err)
-				return
-			}
-			defer resp.Body.Close()
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				http.Error(w, fmt.Sprintf("An error occurred while retrieving key \"%v\"", key), http.StatusInternalServerError)
-				log.Println(err)
-				return
-			}
-
-			fmt.Fprintf(w, "%v", string(body))
+			// Key doesn't exist
+			http.Error(w, fmt.Sprintf("Key \"%v\" does not exist", key), http.StatusBadRequest)
 		} else {
 			http.Error(w, fmt.Sprintf("An error occurred while retrieving key \"%v\"", key), http.StatusInternalServerError)
 			log.Println(err)
@@ -161,6 +162,20 @@ func setKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 200 {
+		// Key is set, add metakey to db
+		err := c.db.Update(func(txn *badger.Txn) error {
+			var numVolumeBytes [4]byte
+			binary.BigEndian.PutUint32(numVolumeBytes[0:4], uint32(numVolume))
+			err := txn.Set([]byte(key), numVolumeBytes[:])
+			return err
+		})
+
+		if err != nil {
+			http.Error(w, fmt.Sprintf("An error occurred while setting key \"%v\"", key), http.StatusInternalServerError)
+			log.Println(err)
+			return
+		}
+
 		fmt.Fprintf(w, "ok")
 	} else {
 		http.Error(w, fmt.Sprintf("An error occurred while setting key \"%v\"", key), http.StatusInternalServerError)

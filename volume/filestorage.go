@@ -59,3 +59,10 @@ func (fs *fileStorage) set(key string, hash string, value []byte) error {
 
 	return nil
 }
+
+// Delete key
+func (fs *fileStorage) delete(key string, hash string) error {
+	path := fs.keyToPath(key, hash)
+	err := os.Remove(path)
+	return err
+}

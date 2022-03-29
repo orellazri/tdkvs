@@ -202,18 +202,26 @@ func deleteKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 		return
 	}
 
+	var numVolume uint32
+
 	// Check if key exists in db
 	err := c.db.View(func(txn *badger.Txn) error {
-		_, err := txn.Get([]byte(key))
+		item, err := txn.Get([]byte(key))
 		if err != nil {
 			return err
 		}
+
+		err = item.Value(func(v []byte) error {
+			numVolume = binary.BigEndian.Uint32(v)
+			return nil
+		})
 
 		return nil
 	})
 
 	if err != nil {
 		if errors.Is(err, badger.ErrKeyNotFound) {
+			// Key doesn't exist
 			http.Error(w, fmt.Sprintf("Key \"%v\" does not exist", key), http.StatusBadRequest)
 			return
 		} else {
@@ -222,17 +230,50 @@ func deleteKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 			return
 		}
 	} else {
-		err := c.db.Update(func(txn *badger.Txn) error {
-			err := txn.Delete([]byte(key))
-			return err
-		})
+		// Key exists
+		hash := utils.HashString(key)
+
+		// Retrieve volume number
+
+		// Send request to volume server
+		req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%v/delete/%v?hash=%v", c.config.Volumes[numVolume], key, hash), strings.NewReader(""))
+		if err != nil {
+			http.Error(w, fmt.Sprintf("An error occurred while deleting key \"%v\"", key), http.StatusInternalServerError)
+			log.Println(err)
+			return
+		}
+		client := http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("An error occurred while deleting key \"%v\"", key), http.StatusInternalServerError)
+			log.Println(err)
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode == 200 {
+			// Key is deleted, delete from db as well
+			err := c.db.Update(func(txn *badger.Txn) error {
+				err := txn.Delete([]byte(key))
+				return err
+			})
+
+			if err != nil {
+				http.Error(w, fmt.Sprintf("An error occurred while deleting key \"%v\"", key), http.StatusInternalServerError)
+				log.Println(err)
+				return
+			}
+
+			fmt.Fprintf(w, "ok")
+		} else {
+			http.Error(w, fmt.Sprintf("An error occurred while deleting key \"%v\"", key), http.StatusInternalServerError)
+			return
+		}
 
 		if err != nil {
 			http.Error(w, fmt.Sprintf("An error occurred while deleting key \"%v\"", key), http.StatusInternalServerError)
 			log.Println(err)
 			return
 		}
-
-		fmt.Fprintf(w, "ok")
 	}
 }

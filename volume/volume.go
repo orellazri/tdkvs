@@ -35,6 +35,9 @@ func Start(port int) {
 	router.HandleFunc("/set/{key}", func(w http.ResponseWriter, r *http.Request) {
 		setKeyHandler(w, r, context)
 	}).Methods("PUT")
+	router.HandleFunc("/delete/{key}", func(w http.ResponseWriter, r *http.Request) {
+		deleteKeyHandler(w, r, context)
+	}).Methods("DELETE")
 	http.Handle("/", router)
 	http.ListenAndServe(fmt.Sprintf("localhost:%v", port), router)
 }
@@ -48,7 +51,6 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 func getKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 	key := mux.Vars(r)["key"]
 	hash := r.URL.Query().Get("hash")
-
 	if key == "" || hash == "" {
 		http.Error(w, "Invalid key or hash", http.StatusBadRequest)
 		return
@@ -82,6 +84,10 @@ func getKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 func setKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 	key := mux.Vars(r)["key"]
 	hash := r.URL.Query().Get("hash")
+	if key == "" || hash == "" {
+		http.Error(w, "Invalid key or hash", http.StatusBadRequest)
+		return
+	}
 
 	data, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -98,4 +104,22 @@ func setKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 	}
 
 	fmt.Fprintf(w, "success")
+}
+
+func deleteKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
+	key := mux.Vars(r)["key"]
+	hash := r.URL.Query().Get("hash")
+	if key == "" || hash == "" {
+		http.Error(w, "Invalid key or hash", http.StatusBadRequest)
+		return
+	}
+
+	err := c.fs.delete(key, hash)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("An error occurred while deleting key \"%v\"", key), http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+
+	fmt.Fprintf(w, "ok")
 }

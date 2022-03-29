@@ -1,5 +1,7 @@
 # tdkvs
 
+[![Tests](https://github.com/orellazri/tdkvs/actions/workflows/go.yml/badge.svg)](https://github.com/orellazri/tdkvs/actions/workflows/go.yml)
+
 Distributed key-value store in Go.
 
 The store consists of a master server and `n` volume servers. The master server uses BadgerDB to store the "metakeys" - the keys that are saved in the store, and which volume server they are stored in. The volume servers store the data as files.

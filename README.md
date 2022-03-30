@@ -4,9 +4,9 @@
 
 Distributed key-value store in Go with support for rebalancing.
 
-The store consists of a master server and `n` volume servers. The master server uses BadgerDB to store the "metakeys" - the keys that are saved in the store, and which volume server they are stored in. The volume servers store the data as files.
+The store consists of a master server and _n_ volume servers. The master server uses BadgerDB to store the "metakeys" - the keys that are saved in the store, and which volume server they are stored in. The volume servers store the data as files.
 
-The store uses [jump consistent hash](https://arxiv.org/pdf/1406.2294.pdf) to quickly and efficiently calculate the correct bucket (volume server) in the range [0, n) to store the key.
+The store uses [jump consistent hash](https://arxiv.org/pdf/1406.2294.pdf) to quickly and efficiently calculate the correct bucket (volume server) in the range _[0, n)_ to store the key.
 
 ## Automatic Rebalancing
 

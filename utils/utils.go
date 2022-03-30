@@ -5,9 +5,16 @@ import (
 	"log"
 )
 
-// Config struct to unmarshal from the yaml file
-type Config struct {
+// Config struct to unmarshal from yaml file for the master server
+type MasterConfig struct {
+	Port    int
 	Volumes []string
+}
+
+// Config struct to unmarshal from yaml file for the volume server
+type VolumeConfig struct {
+	Port int
+	Path string
 }
 
 // Exit with a fatal log if an error occurred

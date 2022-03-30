@@ -10,6 +10,7 @@ import (
 	"os"
 
 	"github.com/gorilla/mux"
+	"github.com/orellazri/tdkvs/utils"
 )
 
 type context struct {
@@ -17,8 +18,8 @@ type context struct {
 }
 
 // Start master server
-func Start(port int) {
-	log.Printf("Volume server starting on port %v...", port)
+func Start(config *utils.VolumeConfig) {
+	log.Printf("Volume server starting on port %v...", config.Port)
 
 	fs := &fileStorage{
 		path: "/tmp/volume1",
@@ -39,7 +40,7 @@ func Start(port int) {
 		deleteKeyHandler(w, r, context)
 	}).Methods("DELETE")
 	http.Handle("/", router)
-	http.ListenAndServe(fmt.Sprintf("localhost:%v", port), router)
+	http.ListenAndServe(fmt.Sprintf("localhost:%v", config.Port), router)
 }
 
 // Handle index route

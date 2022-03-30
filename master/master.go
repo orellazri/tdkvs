@@ -15,13 +15,13 @@ import (
 )
 
 type context struct {
-	config *utils.Config
+	config *utils.MasterConfig
 	db     *badger.DB
 }
 
 // Start master server
-func Start(port int, config *utils.Config) {
-	log.Printf("Master server starting on port %v...", port)
+func Start(config *utils.MasterConfig) {
+	log.Printf("Master server starting on port %v...", config.Port)
 
 	// Initialize BadgerDB
 	options := badger.DefaultOptions("badger")
@@ -46,7 +46,7 @@ func Start(port int, config *utils.Config) {
 			item := it.Item()
 			k := item.Key()
 			err := item.Value(func(v []byte) error {
-				fmt.Printf("key=%s, value=%s\n", k, v)
+				fmt.Printf("key=%s, value=%v\n", k, v)
 				return nil
 			})
 			if err != nil {
@@ -68,7 +68,7 @@ func Start(port int, config *utils.Config) {
 		deleteKeyHandler(w, r, context)
 	}).Methods("DELETE")
 	http.Handle("/", router)
-	http.ListenAndServe(fmt.Sprintf("localhost:%v", port), router)
+	http.ListenAndServe(fmt.Sprintf("localhost:%v", config.Port), router)
 }
 
 // Handle index route

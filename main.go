@@ -13,11 +13,10 @@ import (
 
 func main() {
 	masterCmd := flag.NewFlagSet("master", flag.ExitOnError)
-	masterPort := masterCmd.Int("port", 3000, "port for the master server")
-	masterConfig := masterCmd.String("config", "", "path to config file")
+	masterConfigPath := masterCmd.String("config", "", "path to config file for the master server")
 
 	volumeCmd := flag.NewFlagSet("volume", flag.ExitOnError)
-	volumePort := volumeCmd.Int("port", 3001, "port for the volume server")
+	volumeConfigPath := volumeCmd.String("config", "", "path to config file for the volume server")
 
 	if len(os.Args) < 2 {
 		fmt.Println("expected `master` or `volume` subcommands")
@@ -28,13 +27,13 @@ func main() {
 	case "master":
 		masterCmd.Parse(os.Args[2:])
 
-		if *masterConfig == "" {
+		if *masterConfigPath == "" {
 			fmt.Println("config file is required. specify a path with -config")
 			os.Exit(1)
 		}
 
-		config := utils.Config{}
-		data, err := os.ReadFile(*masterConfig)
+		config := utils.MasterConfig{}
+		data, err := os.ReadFile(*masterConfigPath)
 		utils.AbortOnError(err)
 		err = yaml.Unmarshal(data, &config)
 		if err != nil {
@@ -42,11 +41,24 @@ func main() {
 			os.Exit(1)
 		}
 
-		master.Start(*masterPort, &config)
+		master.Start(&config)
 	case "volume":
 		volumeCmd.Parse(os.Args[2:])
 
-		volume.Start(*volumePort)
+		if *volumeConfigPath == "" {
+			fmt.Println("config file is required. specify a path with -config")
+			os.Exit(1)
+		}
+		config := utils.VolumeConfig{}
+		data, err := os.ReadFile(*volumeConfigPath)
+		utils.AbortOnError(err)
+		err = yaml.Unmarshal(data, &config)
+		if err != nil {
+			fmt.Println("The config yaml file specified is invalid!")
+			os.Exit(1)
+		}
+
+		volume.Start(&config)
 	default:
 		fmt.Println("expected `master` or `volume` subcommands")
 		os.Exit(1)

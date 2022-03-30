@@ -15,12 +15,13 @@ Download the source code and build.
 ### Master server
 
 ```bash
-./master -config=<config file> -port=<port - default 3000>
+./master -config=<config file>
 ```
 
-The config yaml file for the master sould contain the addresses of the volume servers as such:
+The config yaml file for the master server should be as follows:
 
 ```yaml
+port: 3000
 volumes:
   - "http://10.0.0.1:3001"
   - "http://10.0.0.2:3001"
@@ -30,5 +31,12 @@ volumes:
 ### Volume server
 
 ```bash
-./volume --port=<port - default 3001>
+./volume -config=<config file>
+```
+
+The config yaml file for the volume server should be as follows:
+
+```yaml
+port: 3001
+path: /storage_directory/
 ```

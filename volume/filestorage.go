@@ -62,7 +62,18 @@ func (fs *fileStorage) set(key string, hash string, value []byte) error {
 
 // Delete key
 func (fs *fileStorage) delete(key string, hash string) error {
-	path := fs.keyToPath(key, hash)
-	err := os.Remove(path)
+	filePath := fs.keyToPath(key, hash)
+
+	// Remove file
+	err := os.Remove(filePath)
+
+	// Remove first parent directory if empty
+	dir := path.Dir(filePath)
+	os.Remove(dir)
+
+	// Remove second parent directory if empty
+	dir = path.Dir(dir)
+	os.Remove(dir)
+
 	return err
 }

@@ -23,9 +23,9 @@ The config yaml file for the master server should be as follows:
 ```yaml
 port: 3000
 volumes:
-  - "http://10.0.0.1:3001"
-  - "http://10.0.0.2:3001"
-  - "http://10.0.0.3:3001"
+  - http://10.0.0.1:3001
+  - http://10.0.0.2:3001
+  - http://10.0.0.3:3001
 ```
 
 ### Volume server

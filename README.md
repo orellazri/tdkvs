@@ -43,6 +43,6 @@ path: /storage_directory/
 
 ## Automatic Rebalancing
 
-When the master server is started, it checks if volume servers have been added. If so, it rebalanced some keys by moving them to other volume servers in order to get as even balance as possible using jump consistent hash.
+When the master server is started, it checks if volume servers have been added. If so, it rebalances some keys by moving them to other volume servers in order to get a balanced distribution using jump consistent hash.
 
 So, if you wish to add a volume server, you need to change the master's config yaml file accordingly, make sure all the volume servers are running, and restart the master server.

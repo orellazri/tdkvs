@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/dgraph-io/badger/v3"
@@ -36,25 +37,51 @@ func Start(config *utils.MasterConfig) {
 		db,
 	}
 
-	// TEMP: Show all keys
+	// Check number of volume servers and rebalance if needed
+	var metaNumVolumes int
 	err = db.View(func(txn *badger.Txn) error {
-		opts := badger.DefaultIteratorOptions
-		opts.PrefetchSize = 10
-		it := txn.NewIterator(opts)
-		defer it.Close()
-		for it.Rewind(); it.Valid(); it.Next() {
-			item := it.Item()
-			k := item.Key()
-			err := item.Value(func(v []byte) error {
-				fmt.Printf("key=%s, value=%v\n", k, v)
-				return nil
-			})
-			if err != nil {
-				return err
-			}
+		item, err := txn.Get([]byte("_meta_num_volumes"))
+		if err != nil {
+			return err
 		}
+
+		err = item.Value(func(v []byte) error {
+			metaNumVolumes = int(binary.BigEndian.Uint32(v))
+			return nil
+		})
+
 		return nil
 	})
+	if err != nil {
+		if errors.Is(err, badger.ErrKeyNotFound) {
+			// No num volumes meta key, set it
+			err := db.Update(func(txn *badger.Txn) error {
+				var numVolumeBytes [4]byte
+				binary.BigEndian.PutUint32(numVolumeBytes[0:4], uint32(len(config.Volumes)))
+				err := txn.Set([]byte("_meta_num_volumes"), numVolumeBytes[:])
+				return err
+			})
+			utils.AbortOnError(err)
+		} else {
+			utils.AbortOnError(err)
+		}
+	} else {
+		// Num volumes meta key found. Compare with current amount of volume servers
+		// and relanace if needed
+		if metaNumVolumes != len(config.Volumes) {
+			if len(config.Volumes) < metaNumVolumes {
+				log.Fatal("Current amount of volume servers is less than the last amount! Aborting")
+				os.Exit(1)
+			}
+
+			log.Println("Rebalancing...")
+			err := rebalance()
+			utils.AbortOnError(err)
+			log.Println("Rebalancing done!")
+
+			// TODO: Set metakey to new number of volume servers
+		}
+	}
 
 	router := mux.NewRouter()
 	router.HandleFunc("/", indexHandler).Methods("GET")
@@ -113,6 +140,7 @@ func getKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 				return err
 			}
 
+			log.Printf("Got key \"%v\" from volume server %v", key, numVolume)
 			fmt.Fprintf(w, string(body))
 			return nil
 		})
@@ -188,6 +216,7 @@ func setKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 			return
 		}
 
+		log.Printf("Set key \"%v\" in volume server %v", key, numVolume)
 		fmt.Fprintf(w, "ok")
 	} else {
 		http.Error(w, fmt.Sprintf("An error occurred while setting key \"%v\"", key), http.StatusInternalServerError)
@@ -264,6 +293,7 @@ func deleteKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 				return
 			}
 
+			log.Printf("Deleted key \"%v\" from volume server %v", key, numVolume)
 			fmt.Fprintf(w, "ok")
 		} else {
 			http.Error(w, fmt.Sprintf("An error occurred while deleting key \"%v\"", key), http.StatusInternalServerError)
@@ -276,4 +306,10 @@ func deleteKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 			return
 		}
 	}
+}
+
+// Rebalance keys in volume servers
+func rebalance() error {
+
+	return nil
 }

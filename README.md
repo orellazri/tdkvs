@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/orellazri/tdkvs/actions/workflows/tests.yml/badge.svg)](https://github.com/orellazri/tdkvs/actions/workflows/tests.yml)
 
-Distributed key-value store in Go.
+Distributed key-value store in Go with support for rebalancing.
 
 The store consists of a master server and `n` volume servers. The master server uses BadgerDB to store the "metakeys" - the keys that are saved in the store, and which volume server they are stored in. The volume servers store the data as files.
 
@@ -40,3 +40,9 @@ The config yaml file for the volume server should be as follows:
 port: 3001
 path: /storage_directory/
 ```
+
+## Automatic Rebalancing
+
+When the master server is started, it checks if volume servers have been added. If so, it rebalanced some keys by moving them to other volume servers in order to get as even balance as possible using jump consistent hash.
+
+So, if you wish to add a volume server, you need to change the master's config yaml file accordingly, make sure all the volume servers are running, and restart the master server.

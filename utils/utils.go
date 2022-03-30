@@ -50,7 +50,7 @@ func HashString(key string) uint64 {
 // Call ChooseBucket (jump consistent hash) after converting a string key
 // to uint64
 // Returns the hash (key as uint64) and the bucket number
-func ChooseBucketString(key string, numOfBuckets int32) (uint64, int32) {
+func ChooseBucketString(key string, numOfBuckets int32) (uint64, uint32) {
 	hash := HashString(key)
-	return hash, ChooseBucket(hash, numOfBuckets)
+	return hash, uint32(ChooseBucket(hash, numOfBuckets))
 }

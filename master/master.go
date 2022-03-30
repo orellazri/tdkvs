@@ -1,6 +1,7 @@
 package master
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -36,6 +37,25 @@ func Start(config *utils.MasterConfig) {
 		config,
 		db,
 	}
+
+	err = db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchSize = 10
+		it := txn.NewIterator(opts)
+		defer it.Close()
+		for it.Rewind(); it.Valid(); it.Next() {
+			item := it.Item()
+			k := item.Key()
+			err := item.Value(func(v []byte) error {
+				fmt.Printf("key=%s, value=%v\n", k, v)
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 
 	// Check number of volume servers and rebalance if needed
 	var metaNumVolumes int
@@ -75,11 +95,19 @@ func Start(config *utils.MasterConfig) {
 			}
 
 			log.Println("Rebalancing...")
-			err := rebalance()
+			err := rebalance(context)
 			utils.AbortOnError(err)
-			log.Println("Rebalancing done!")
 
-			// TODO: Set metakey to new number of volume servers
+			// Set metakey to new number of volume servers
+			err = db.Update(func(txn *badger.Txn) error {
+				var numVolumeBytes [4]byte
+				binary.BigEndian.PutUint32(numVolumeBytes[0:4], uint32(len(config.Volumes)))
+				err := txn.Set([]byte("_meta_num_volumes"), numVolumeBytes[:])
+				return err
+			})
+			utils.AbortOnError(err)
+
+			log.Println("Rebalancing done!")
 		}
 	}
 
@@ -309,7 +337,100 @@ func deleteKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 }
 
 // Rebalance keys in volume servers
-func rebalance() error {
+func rebalance(c *context) error {
+	err := c.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchSize = 10
+		it := txn.NewIterator(opts)
+		defer it.Close()
+		for it.Rewind(); it.Valid(); it.Next() {
+			item := it.Item()
+			key := string(item.Key())
+
+			// Skip meta keys
+			if strings.HasPrefix(key, "_meta") {
+				continue
+			}
+
+			// Check if key needs to be moved
+			err := item.Value(func(v []byte) error {
+				currentVolume := binary.BigEndian.Uint32(v)
+				hash, newVolume := utils.ChooseBucketString(key, int32(len(c.config.Volumes)))
+				if newVolume != currentVolume {
+					log.Printf("Moving %v from %v to %v\n", key, currentVolume, newVolume)
+
+					// Get value from current volume server
+					resp, err := http.Get(fmt.Sprintf("%v/get/%v?hash=%v", c.config.Volumes[currentVolume], key, hash))
+					if err != nil {
+						return err
+					}
+					if resp.StatusCode != 200 {
+						return errors.New("Respose from volume server is not 200 OK")
+					}
+
+					body, err := io.ReadAll(resp.Body)
+					if err != nil {
+						return err
+					}
+
+					value := body
+
+					resp.Body.Close()
+
+					// Delete key from current volume server
+					req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%v/delete/%v?hash=%v", c.config.Volumes[currentVolume], key, hash), strings.NewReader(""))
+					if err != nil {
+						return err
+					}
+					client := http.Client{}
+					resp, err = client.Do(req)
+					if err != nil {
+						return err
+					}
+
+					if resp.StatusCode != 200 {
+						return errors.New("Response from volue server is not 200 OK")
+					}
+					resp.Body.Close()
+
+					// Set key in new volume server
+					req, err = http.NewRequest(http.MethodPut, fmt.Sprintf("%v/set/%v?hash=%v", c.config.Volumes[newVolume], key, hash), bytes.NewBuffer(value))
+					if err != nil {
+						return err
+					}
+					client = http.Client{}
+					resp, err = client.Do(req)
+					if err != nil {
+						return err
+					}
+
+					if resp.StatusCode != 200 {
+						return errors.New("Response from volue server is not 200 OK")
+					}
+					resp.Body.Close()
+
+					// Update metakey in db
+					err = c.db.Update(func(txn *badger.Txn) error {
+						var numVolumeBytes [4]byte
+						binary.BigEndian.PutUint32(numVolumeBytes[0:4], uint32(newVolume))
+						err := txn.Set([]byte(key), numVolumeBytes[:])
+						return err
+					})
+					if err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

@@ -22,7 +22,7 @@ func Start(config *utils.VolumeConfig) {
 	log.Printf("Volume server starting on port %v...", config.Port)
 
 	fs := &fileStorage{
-		path: "/tmp/volume1",
+		path: config.Path,
 	}
 	context := &context{
 		fs,
@@ -71,6 +71,8 @@ func getKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 		return
 	}
 
+	log.Printf("Got key \"%v\"", key)
+
 	switch as {
 	case "int":
 		fmt.Fprintf(w, "%v", binary.BigEndian.Uint64(value))
@@ -104,6 +106,8 @@ func setKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 		return
 	}
 
+	log.Printf("Set key \"%v\"", key)
+
 	fmt.Fprintf(w, "success")
 }
 
@@ -121,6 +125,8 @@ func deleteKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 		log.Println(err)
 		return
 	}
+
+	log.Printf("Deleted key \"%v\"", key)
 
 	fmt.Fprintf(w, "ok")
 }

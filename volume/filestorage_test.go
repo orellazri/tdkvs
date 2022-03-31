@@ -13,7 +13,7 @@ func TestKeyToPath(t *testing.T) {
 
 	expected := path.Join("tmp", "volume1", "12", "1234", "123456789_test")
 	if actual != expected {
-		t.Errorf("Expected %v but got %v", expected, actual)
+		t.Errorf("expected %v but got %v", expected, actual)
 	}
 }
 
@@ -32,6 +32,6 @@ func TestSetGetKey(t *testing.T) {
 	}
 
 	if bytes.Compare(actual, value) != 0 {
-		t.Errorf("Expected %v but got %v", value, actual)
+		t.Errorf("expected %v but got %v", value, actual)
 	}
 }

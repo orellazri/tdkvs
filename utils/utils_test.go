@@ -10,7 +10,7 @@ func TestChooseBucketInRange(t *testing.T) {
 		key := rand.Uint64()
 		numBucket := ChooseBucket(key, 10)
 		if numBucket < 0 || numBucket >= 10 {
-			t.Error("Number of bucket is not in range [0, 10)")
+			t.Error("number of bucket is not in range [0, 10)")
 		}
 	}
 }

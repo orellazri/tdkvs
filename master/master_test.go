@@ -35,7 +35,7 @@ func TestGetNonexistentKey(t *testing.T) {
 	defer server.Close()
 
 	client := http.DefaultClient
-	resp, err := client.Get(server.URL + "/get/testing_doesnt_exist")
+	resp, err := client.Get(server.URL + "/get/test_nonexistent_key")
 	if err != nil {
 		t.Error(err)
 	}

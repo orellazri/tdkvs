@@ -38,25 +38,6 @@ func Start(config *utils.MasterConfig) {
 		db,
 	}
 
-	err = db.View(func(txn *badger.Txn) error {
-		opts := badger.DefaultIteratorOptions
-		opts.PrefetchSize = 10
-		it := txn.NewIterator(opts)
-		defer it.Close()
-		for it.Rewind(); it.Valid(); it.Next() {
-			item := it.Item()
-			k := item.Key()
-			err := item.Value(func(v []byte) error {
-				fmt.Printf("key=%s, value=%v\n", k, v)
-				return nil
-			})
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-
 	// Check number of volume servers and rebalance if needed
 	var metaNumVolumes int
 	err = db.View(func(txn *badger.Txn) error {
@@ -65,7 +46,7 @@ func Start(config *utils.MasterConfig) {
 			return err
 		}
 
-		err = item.Value(func(v []byte) error {
+		item.Value(func(v []byte) error {
 			metaNumVolumes = int(binary.BigEndian.Uint32(v))
 			return nil
 		})
@@ -160,7 +141,7 @@ func getKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 			defer resp.Body.Close()
 
 			if resp.StatusCode != 200 {
-				return errors.New("Respose from volume server is not 200 OK")
+				return errors.New("respose from volume server is not 200 OK")
 			}
 
 			body, err := io.ReadAll(resp.Body)
@@ -169,7 +150,7 @@ func getKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 			}
 
 			log.Printf("Got key \"%v\" from volume server %v", key, numVolume)
-			fmt.Fprintf(w, string(body))
+			w.Write(body)
 			return nil
 		})
 		if err != nil {
@@ -188,17 +169,18 @@ func getKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 			log.Println(err)
 		}
 	}
-
 }
 
 // Handle setting keys
 func setKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 	key := mux.Vars(r)["key"]
+
 	if key == "" {
 		http.Error(w, "Key is required", http.StatusBadRequest)
 		return
 	}
 
+	// Read request body
 	data, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "An error occurred while parsing request body", http.StatusInternalServerError)
@@ -211,6 +193,7 @@ func setKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 		return
 	}
 
+	// Choose bucket and generate ahsh
 	hash, numVolume := utils.ChooseBucketString(key, int32(len(c.config.Volumes)))
 
 	// Send request to volume server
@@ -229,26 +212,27 @@ func setKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 200 {
-		// Key is set, add metakey to db
-		err := c.db.Update(func(txn *badger.Txn) error {
-			var numVolumeBytes [4]byte
-			binary.BigEndian.PutUint32(numVolumeBytes[0:4], uint32(numVolume))
-			err := txn.Set([]byte(key), numVolumeBytes[:])
-			return err
-		})
-
-		if err != nil {
-			http.Error(w, fmt.Sprintf("An error occurred while setting key \"%v\"", key), http.StatusInternalServerError)
-			log.Println(err)
-			return
-		}
-
-		log.Printf("Set key \"%v\" in volume server %v", key, numVolume)
-		fmt.Fprintf(w, "ok")
-	} else {
+	if resp.StatusCode != 200 {
 		http.Error(w, fmt.Sprintf("An error occurred while setting key \"%v\"", key), http.StatusInternalServerError)
+		return
 	}
+
+	// Key is set, add metakey to db
+	err = c.db.Update(func(txn *badger.Txn) error {
+		var numVolumeBytes [4]byte
+		binary.BigEndian.PutUint32(numVolumeBytes[0:4], uint32(numVolume))
+		err := txn.Set([]byte(key), numVolumeBytes[:])
+		return err
+	})
+
+	if err != nil {
+		http.Error(w, fmt.Sprintf("An error occurred while setting key \"%v\"", key), http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+
+	log.Printf("Set key \"%v\" in volume server %v", key, numVolume)
+	fmt.Fprintf(w, "ok")
 }
 
 // Handle deleting keys
@@ -268,7 +252,8 @@ func deleteKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 			return err
 		}
 
-		err = item.Value(func(v []byte) error {
+		item.Value(func(v []byte) error {
+			// Key exists. Get volume number from db
 			numVolume = binary.BigEndian.Uint32(v)
 			return nil
 		})
@@ -286,54 +271,45 @@ func deleteKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 			log.Println(err)
 			return
 		}
-	} else {
-		// Key exists
-		hash := utils.HashString(key)
-
-		// Retrieve volume number
-
-		// Send request to volume server
-		req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%v/delete/%v?hash=%v", c.config.Volumes[numVolume], key, hash), strings.NewReader(""))
-		if err != nil {
-			http.Error(w, fmt.Sprintf("An error occurred while deleting key \"%v\"", key), http.StatusInternalServerError)
-			log.Println(err)
-			return
-		}
-		client := http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("An error occurred while deleting key \"%v\"", key), http.StatusInternalServerError)
-			log.Println(err)
-			return
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode == 200 {
-			// Key is deleted, delete from db as well
-			err := c.db.Update(func(txn *badger.Txn) error {
-				err := txn.Delete([]byte(key))
-				return err
-			})
-
-			if err != nil {
-				http.Error(w, fmt.Sprintf("An error occurred while deleting key \"%v\"", key), http.StatusInternalServerError)
-				log.Println(err)
-				return
-			}
-
-			log.Printf("Deleted key \"%v\" from volume server %v", key, numVolume)
-			fmt.Fprintf(w, "ok")
-		} else {
-			http.Error(w, fmt.Sprintf("An error occurred while deleting key \"%v\"", key), http.StatusInternalServerError)
-			return
-		}
-
-		if err != nil {
-			http.Error(w, fmt.Sprintf("An error occurred while deleting key \"%v\"", key), http.StatusInternalServerError)
-			log.Println(err)
-			return
-		}
 	}
+
+	// Key exists
+	hash := utils.HashString(key)
+
+	// Send request to volume server
+	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%v/delete/%v?hash=%v", c.config.Volumes[numVolume], key, hash), strings.NewReader(""))
+	if err != nil {
+		http.Error(w, fmt.Sprintf("An error occurred while deleting key \"%v\"", key), http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+	client := http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("An error occurred while deleting key \"%v\"", key), http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		http.Error(w, fmt.Sprintf("An error occurred while deleting key \"%v\"", key), http.StatusInternalServerError)
+		return
+	}
+
+	// Key is deleted. Delete it from db as well
+	err = c.db.Update(func(txn *badger.Txn) error {
+		err := txn.Delete([]byte(key))
+		return err
+	})
+	if err != nil {
+		http.Error(w, fmt.Sprintf("An error occurred while deleting key \"%v\"", key), http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+
+	log.Printf("Deleted key \"%v\" from volume server %v", key, numVolume)
+	fmt.Fprintf(w, "ok")
 }
 
 // Rebalance keys in volume servers
@@ -357,7 +333,7 @@ func rebalance(c *context) error {
 				currentVolume := binary.BigEndian.Uint32(v)
 				hash, newVolume := utils.ChooseBucketString(key, int32(len(c.config.Volumes)))
 				if newVolume != currentVolume {
-					log.Printf("Moving %v from %v to %v\n", key, currentVolume, newVolume)
+					log.Printf("Moving \"%v\" from volume server %v to %v\n", key, currentVolume, newVolume)
 
 					// Get value from current volume server
 					resp, err := http.Get(fmt.Sprintf("%v/get/%v?hash=%v", c.config.Volumes[currentVolume], key, hash))
@@ -365,7 +341,7 @@ func rebalance(c *context) error {
 						return err
 					}
 					if resp.StatusCode != 200 {
-						return errors.New("Respose from volume server is not 200 OK")
+						return errors.New("respose from volume server is not 200 OK")
 					}
 
 					body, err := io.ReadAll(resp.Body)
@@ -389,7 +365,7 @@ func rebalance(c *context) error {
 					}
 
 					if resp.StatusCode != 200 {
-						return errors.New("Response from volue server is not 200 OK")
+						return errors.New("response from volue server is not 200 OK")
 					}
 					resp.Body.Close()
 
@@ -405,7 +381,7 @@ func rebalance(c *context) error {
 					}
 
 					if resp.StatusCode != 200 {
-						return errors.New("Response from volue server is not 200 OK")
+						return errors.New("response from volue server is not 200 OK")
 					}
 					resp.Body.Close()
 

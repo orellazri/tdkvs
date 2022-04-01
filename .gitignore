@@ -22,4 +22,4 @@ go.work
 badger/
 *.yaml
 *.yml
-tools/
+*.sh

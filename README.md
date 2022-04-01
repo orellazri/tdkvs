@@ -25,7 +25,7 @@ In order to delete a volume server from the cluster, you need to follow these st
 - Make sure the master's config yaml file contains all the volume servers including the one you wish to delete
 - Make sure all the volume servers are up, including the one you wish to delete
 - Shut down the master server and run with `./tdkvs master -config=<config file> -delete=<index>` where `index` is the index of the volume server in the yaml file (starting from 0)
-- Remove the volume server from the master's config yaml file and shut it down
+- Remove the volume server from the master's config yaml file and shut the volume server down
 - Re run the master server as usual
 
 ## Usage

@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/orellazri/tdkvs/actions/workflows/tests.yml/badge.svg)](https://github.com/orellazri/tdkvs/actions/workflows/tests.yml)
 
-Distributed key-value store in Go with support for rebalancing and deleting volume servers.
+Distributed key-value store in Go with support for rebalancing and deletion of volume servers.
 
 The store consists of a master server and _n_ volume servers. The master server uses BadgerDB to store the "metakeys" - the keys that are saved in the volume servers, and which volume server they are stored in. The volume servers store the data as files.
 

@@ -17,7 +17,7 @@ type context struct {
 	fs *fileStorage
 }
 
-// Start master server
+// Start volume server
 func Start(config *utils.VolumeConfig) {
 	log.Printf("Volume server starting on port %v...", config.Port)
 
@@ -111,6 +111,7 @@ func setKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 	fmt.Fprintf(w, "success")
 }
 
+// Handle deleting keys
 func deleteKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 	key := mux.Vars(r)["key"]
 	hash := r.URL.Query().Get("hash")

@@ -2,6 +2,7 @@ package volume
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path"
 	"testing"
@@ -21,7 +22,7 @@ func TestSetGetKey(t *testing.T) {
 	tempDir := os.TempDir()
 	fs := fileStorage{path: tempDir}
 	key := "test"
-	hash := "1234556789"
+	hash := "123456789"
 	value := []byte("testvalue")
 
 	fs.set(key, hash, value)
@@ -31,7 +32,30 @@ func TestSetGetKey(t *testing.T) {
 		t.Error(err)
 	}
 
-	if bytes.Compare(actual, value) != 0 {
+	if !bytes.Equal(actual, value) {
 		t.Errorf("expected %v but got %v", value, actual)
+	}
+}
+
+func TestSetDeleteKey(t *testing.T) {
+	tempDir := os.TempDir()
+	fs := fileStorage{path: tempDir}
+	key := "test"
+	hash := "123456789"
+	value := []byte("testvalue")
+
+	fs.set(key, hash, value)
+
+	err := fs.delete(key, hash)
+	if err != nil {
+		t.Error(err)
+	}
+
+	_, err = os.Stat(path.Join(tempDir, "12", "1234", "123456789_test"))
+	if err == nil {
+		t.Error("key still exists after deletion")
+	}
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		t.Error(err)
 	}
 }

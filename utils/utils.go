@@ -39,18 +39,18 @@ func ChooseBucket(key uint64, numOfBuckets int32) int32 {
 	return int32(b)
 }
 
-func HashString(key string) uint64 {
-	// TODO: Check if this is safe for concurrent use
-	hahser := fnv.New64()
-	hahser.Write([]byte(key))
-	hash := hahser.Sum64()
-	return hash
-}
-
 // Call ChooseBucket (jump consistent hash) after converting a string key
 // to uint64
 // Returns the hash (key as uint64) and the bucket number
 func ChooseBucketString(key string, numOfBuckets int32) (uint64, uint32) {
 	hash := HashString(key)
 	return hash, uint32(ChooseBucket(hash, numOfBuckets))
+}
+
+func HashString(key string) uint64 {
+	// TODO: Check if this is safe for concurrent use
+	hahser := fnv.New64()
+	hahser.Write([]byte(key))
+	hash := hahser.Sum64()
+	return hash
 }

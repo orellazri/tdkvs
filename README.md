@@ -18,7 +18,7 @@ So, if you wish to add a volume server, you need to change the master's config y
 
 ## Volume Server Deletion
 
-When deleting a volume server, the store will move all its keys to a new volume server chosen by the jump consistent hash alogirthm. It will then re-balance the cluster.
+When deleting a volume server, the store will move all its keys to a new volume server chosen by the jump consistent hash alogirthm. It will then re-balance the rest of the cluster.
 
 In order to delete a volume server from the cluster, you need to follow these steps:
 

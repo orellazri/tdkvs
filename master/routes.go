@@ -1,7 +1,6 @@
 package master
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -218,103 +217,4 @@ func deleteKeyHandler(w http.ResponseWriter, r *http.Request, c *context) {
 
 	log.Printf("Deleted key \"%v\" from volume server %v", key, numVolume)
 	fmt.Fprintf(w, "ok")
-}
-
-// Rebalance keys in volume servers
-func rebalance(c *context) error {
-	err := c.db.View(func(txn *badger.Txn) error {
-		opts := badger.DefaultIteratorOptions
-		opts.PrefetchSize = 10
-		it := txn.NewIterator(opts)
-		defer it.Close()
-		for it.Rewind(); it.Valid(); it.Next() {
-			item := it.Item()
-			key := string(item.Key())
-
-			// Skip meta keys
-			if strings.HasPrefix(key, "_meta") {
-				continue
-			}
-
-			// Check if key needs to be moved
-			err := item.Value(func(v []byte) error {
-				currentVolume := binary.BigEndian.Uint32(v)
-				hash, newVolume := utils.ChooseBucketString(key, int32(len(c.config.Volumes)))
-				if newVolume != currentVolume {
-					log.Printf("Moving \"%v\" from volume server %v to %v\n", key, currentVolume, newVolume)
-
-					// Get value from current volume server
-					resp, err := http.Get(fmt.Sprintf("%v/get/%v?hash=%v", c.config.Volumes[currentVolume], key, hash))
-					if err != nil {
-						return err
-					}
-					if resp.StatusCode != 200 {
-						return errors.New("respose from volume server is not 200 OK")
-					}
-
-					body, err := io.ReadAll(resp.Body)
-					if err != nil {
-						return err
-					}
-
-					value := body
-
-					resp.Body.Close()
-
-					// Delete key from current volume server
-					req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%v/delete/%v?hash=%v", c.config.Volumes[currentVolume], key, hash), strings.NewReader(""))
-					if err != nil {
-						return err
-					}
-					client := http.Client{}
-					resp, err = client.Do(req)
-					if err != nil {
-						return err
-					}
-
-					if resp.StatusCode != 200 {
-						return errors.New("response from volue server is not 200 OK")
-					}
-					resp.Body.Close()
-
-					// Set key in new volume server
-					req, err = http.NewRequest(http.MethodPut, fmt.Sprintf("%v/set/%v?hash=%v", c.config.Volumes[newVolume], key, hash), bytes.NewBuffer(value))
-					if err != nil {
-						return err
-					}
-					client = http.Client{}
-					resp, err = client.Do(req)
-					if err != nil {
-						return err
-					}
-
-					if resp.StatusCode != 200 {
-						return errors.New("response from volue server is not 200 OK")
-					}
-					resp.Body.Close()
-
-					// Update metakey in db
-					err = c.db.Update(func(txn *badger.Txn) error {
-						var numVolumeBytes [4]byte
-						binary.BigEndian.PutUint32(numVolumeBytes[0:4], uint32(newVolume))
-						err := txn.Set([]byte(key), numVolumeBytes[:])
-						return err
-					})
-					if err != nil {
-						return err
-					}
-				}
-				return nil
-			})
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-
-	return nil
 }

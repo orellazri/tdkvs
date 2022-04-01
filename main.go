@@ -14,6 +14,7 @@ import (
 func main() {
 	masterCmd := flag.NewFlagSet("master", flag.ExitOnError)
 	masterConfigPath := masterCmd.String("config", "", "path to config file for the master server")
+	masterDeleteVolume := masterCmd.Int("delete", -1, "delete a volume server")
 
 	volumeCmd := flag.NewFlagSet("volume", flag.ExitOnError)
 	volumeConfigPath := volumeCmd.String("config", "", "path to config file for the volume server")
@@ -32,7 +33,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		config := utils.MasterConfig{}
+		config := &master.Config{}
 		data, err := os.ReadFile(*masterConfigPath)
 		utils.AbortOnError(err)
 		err = yaml.Unmarshal(data, &config)
@@ -40,8 +41,14 @@ func main() {
 			fmt.Println("The config yaml file specified is invalid!")
 			os.Exit(1)
 		}
+		config.DeleteVolume = *masterDeleteVolume
 
-		master.Start(&config)
+		// Check if delete volume flag is set
+		if *masterDeleteVolume != -1 {
+			master.Start(config, master.DeleteVolume)
+		} else {
+			master.Start(config, master.Normal)
+		}
 	case "volume":
 		volumeCmd.Parse(os.Args[2:])
 
@@ -49,7 +56,7 @@ func main() {
 			fmt.Println("config file is required. specify a path with -config")
 			os.Exit(1)
 		}
-		config := utils.VolumeConfig{}
+		config := &volume.Config{}
 		data, err := os.ReadFile(*volumeConfigPath)
 		utils.AbortOnError(err)
 		err = yaml.Unmarshal(data, &config)
@@ -58,7 +65,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		volume.Start(&config)
+		volume.Start(config)
 	default:
 		fmt.Println("expected `master` or `volume` subcommands")
 		os.Exit(1)

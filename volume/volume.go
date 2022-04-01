@@ -6,15 +6,21 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/orellazri/tdkvs/utils"
 )
 
+// Config struct to unmarshal from yaml file for the volume server
+type Config struct {
+	Port int    // Server port
+	Path string // Path to file storage directory
+}
+
+// Context for global state
 type context struct {
 	fs *fileStorage
 }
 
 // Start volume server
-func Start(config *utils.VolumeConfig) {
+func Start(config *Config) {
 	log.Printf("Volume server starting on port %v...", config.Port)
 
 	fs := &fileStorage{

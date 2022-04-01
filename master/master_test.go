@@ -22,7 +22,7 @@ func TestGetNonexistentKey(t *testing.T) {
 	defer db.Close()
 
 	context := &context{
-		config: &utils.MasterConfig{Port: 3000, Volumes: []string{"http://localhost:3001"}},
+		config: &Config{Port: 3000, Volumes: []string{"http://localhost:3001"}},
 		db:     db,
 	}
 

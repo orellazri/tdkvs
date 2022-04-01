@@ -16,7 +16,7 @@ So, if you wish to add a volume server, you need to change the master's config y
 
 **NOTE:** When adding volume servers, make sure to add them to the bottom of the list in the master's config yaml file since the store works with ascending indices.
 
-## Delete Volume Server
+## Volume Server Deletion
 
 When deleting a volume server, the store will move all its keys to a new volume server chosen by the jump consistent hash alogirthm. It will then re-balance the cluster.
 

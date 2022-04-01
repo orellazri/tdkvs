@@ -18,6 +18,18 @@ func TestKeyToPath(t *testing.T) {
 	}
 }
 
+func TestGetNonexistentKey(t *testing.T) {
+	tempDir := os.TempDir()
+	fs := fileStorage{path: tempDir}
+	key := "test"
+	hash := "123456789"
+
+	_, err := fs.get(key, hash)
+	if err == nil {
+		t.Error("expected to fail on getting nonexistent key")
+	}
+}
+
 func TestSetGetKey(t *testing.T) {
 	tempDir := os.TempDir()
 	fs := fileStorage{path: tempDir}

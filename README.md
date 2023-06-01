@@ -8,6 +8,11 @@ The store consists of a master server and _n_ volume servers. The master server 
 
 The store uses [jump consistent hash](https://arxiv.org/pdf/1406.2294.pdf) to quickly and efficiently calculate the correct bucket (volume server) in the range _[0, n)_ to store the key.
 
+## Why?
+![image](https://github.com/orellazri/tdkvs/assets/32670283/e2474d68-2eb0-484b-9c51-5fc9bfcf740e)
+
+Jump consistent hash is an extremely efficient algorithm that shows significant performance improvements over traditional hashing key distribution algorithms that we know. This projects aims to use it in practice.
+
 ## Automatic Rebalancing
 
 When the master server is started, it checks if volume servers have been added. If so, it rebalances some keys by moving them to other volume servers in order to get a balanced distribution using jump consistent hash.

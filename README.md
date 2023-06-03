@@ -9,6 +9,7 @@ The store consists of a master server and _n_ volume servers. The master server 
 The store uses [jump consistent hash](https://arxiv.org/pdf/1406.2294.pdf) to quickly and efficiently calculate the correct bucket (volume server) in the range _[0, n)_ to store the key.
 
 ## Why?
+
 ![image](https://github.com/orellazri/tdkvs/assets/32670283/e2474d68-2eb0-484b-9c51-5fc9bfcf740e)
 
 Jump consistent hash is an extremely efficient algorithm that shows significant performance improvements over traditional hashing key distribution algorithms that we know. This projects aims to use it in practice.
@@ -65,3 +66,11 @@ The config yaml file for the volume server should be as follows:
 port: 3001
 path: /storage_directory/
 ```
+
+## API
+
+| Endpoint       | Method | Description                   |
+| -------------- | ------ | ----------------------------- |
+| /get/\<key>    | GET    | Retrieve a value              |
+| /set/\<key>    | PUT    | Add or set the value of a key |
+| /delete/\<key> | DELEET | Delete a key-value pair       |

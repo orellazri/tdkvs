@@ -10,7 +10,7 @@ import (
 
 	"github.com/dgraph-io/badger/v3"
 	"github.com/gorilla/mux"
-	"github.com/orellazri/tdkvs/utils"
+	"github.com/orellazri/tdkvs/internal/utils"
 )
 
 func TestGetNonexistentKey(t *testing.T) {
